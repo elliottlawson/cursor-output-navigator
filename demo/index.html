@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo — Cursor Agents Output Navigator</title>
+<!--
+  Synthetic demo page for the Cursor Agents Output Navigator userscript.
+  Mimics the DOM structure of cursor.com/agents conversations with entirely
+  fictional content, so the script can be previewed without a Cursor account.
+  To try it: serve this file, run the userscript in your browser console
+  (or install it), and watch the right edge.
+-->
+<style>
+  :root {
+    --bg-chrome: #f8f8f8;
+    --bg-card: #ffffff;
+    --text-primary: #141414;
+    --text-secondary: rgba(20, 20, 20, .74);
+    --text-tertiary: rgba(20, 20, 20, .45);
+    --border-primary: rgba(20, 20, 20, .2);
+    --accent: #2778c1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-chrome: #1a1a1a;
+      --bg-card: #242424;
+      --text-primary: #ececec;
+      --text-secondary: rgba(236, 236, 236, .74);
+      --text-tertiary: rgba(236, 236, 236, .45);
+      --border-primary: rgba(236, 236, 236, .2);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg-chrome); color: var(--text-primary);
+    font: 15px/1.65 system-ui, -apple-system, sans-serif;
+    height: 100vh; overflow: hidden;
+  }
+  [data-component="agent-main-content-scroll-container"] {
+    height: 100vh; overflow-y: auto;
+    display: flex; flex-direction: column; align-items: center; padding: 24px 12px 200px;
+  }
+  .column { width: 100%; max-width: 720px; }
+  .turns { display: flex; flex-direction: column; gap: 48px; }
+  .w-full { width: 100%; }
+  .sticky {
+    position: sticky; top: 0; z-index: 30;
+    background: var(--bg-chrome); padding: 8px 0;
+  }
+  .human-message-card {
+    background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: 12px; padding: 12px 16px; font-weight: 500;
+  }
+  .worked { color: var(--text-tertiary); font-size: 13px; margin: 12px 0 4px; }
+  .prose { padding: 4px 9px; color: var(--text-primary); }
+  .prose h2 { font-size: 18px; margin: 14px 0 8px; }
+  .prose p { margin: 8px 0; }
+  .prose li { margin: 4px 0 4px 20px; }
+  .prose code {
+    background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: 4px; padding: 1px 5px; font-size: 13px;
+  }
+  .hint {
+    position: fixed; left: 16px; bottom: 16px; z-index: 50;
+    background: var(--bg-card); border: 1px solid var(--border-primary);
+    border-radius: 8px; padding: 10px 14px; font-size: 12px;
+    color: var(--text-secondary); max-width: 320px;
+  }
+</style>
+</head>
+<body>
+
+<div data-component="agent-main-content-scroll-container">
+  <div class="column">
+    <div class="turns" id="turns"></div>
+  </div>
+</div>
+
+<div class="hint">
+  <strong>Demo page.</strong> The conversation below is fictional.
+  Run <code>cursor-agents-output-nav.user.js</code> (browser console or your
+  userscript manager) to see the rail, dots, and the "↑ Latest" pill on the right.
+</div>
+
+<script>
+// Build synthetic turns that mimic the cursor.com/agents DOM shape.
+const turns = [
+  {
+    user: 'Can you refactor the checkout module into smaller pieces?',
+    out: `<p>I split the checkout module into four focused units: <code>cart</code>, <code>pricing</code>, <code>payment</code>, and <code>confirmation</code>. Each now has a single entry point and its own tests.</p>
+          <h2>What changed</h2>
+          <ul><li>Extracted price calculation into <code>pricing.js</code> — pure functions, no DOM access.</li>
+          <li>Moved payment provider calls behind a small adapter so the rest of the code stops caring which provider is configured.</li>
+          <li>The old 600-line <code>checkout.js</code> is now a 90-line orchestrator.</li></ul>
+          <p>All 42 existing tests pass without modification, plus 11 new tests cover the extracted pricing rules.</p>`
+  },
+  {
+    user: 'Nice. Now add a discount-code field to the pricing step.',
+    out: `<p>Added a <code>discounts</code> stage to the pricing pipeline. Codes resolve against a pluggable rule table and apply before tax.</p>
+          <h2>Behavior</h2>
+          <ul><li>Unknown or expired codes show an inline message and do not block checkout.</li>
+          <li>Percentage and fixed-amount codes both supported; stacking is opt-in per code.</li>
+          <li>Discount lines appear in the order summary with their code as the label.</li></ul>
+          <p>Edge cases covered: empty code, whitespace-only code, code applied twice, code that zeroes the cart.</p>`
+  },
+  {
+    user: 'The payment step feels slow. Can you profile it?',
+    out: `<p>Profiled with 200 sample checkouts. Two hotspots, both in the adapter:</p>
+          <h2>Findings</h2>
+          <ul><li><code>tokenizeCard</code> was awaited serially with <code>createCustomer</code> — they are independent and now run in parallel (~380ms saved on the median path).</li>
+          <li>The retry helper re-fetched the config on every attempt; it is now memoized per session.</li></ul>
+          <p>Median payment-step time went from 1.9s to 1.1s in the sample run. No behavioral changes; the public API of the adapter is untouched.</p>`
+  },
+  {
+    user: 'Great. Write a summary I can paste into the release notes.',
+    out: `<h2>Release notes — checkout refactor</h2>
+          <ul><li>Checkout module split into <code>cart</code>, <code>pricing</code>, <code>payment</code>, and <code>confirmation</code> units.</li>
+          <li>New discount-code field with inline validation and stackable rules.</li>
+          <li>Payment step is ~40% faster after parallelizing provider calls and memoizing config.</li></ul>
+          <p>Migration: none required. All changes are internal to the checkout module; the public interface is unchanged.</p>`
+  },
+  {
+    user: 'One more thing — add a progress indicator across the steps.',
+    out: `<p>Added a four-step progress indicator driven by the orchestrator's state machine, so it can never disagree with the actual step.</p>
+          <h2>Details</h2>
+          <ul><li>Steps: Cart → Pricing → Payment → Confirmation, with completed, current, and upcoming states.</li>
+          <li>Clicking a completed step navigates back without losing entered data.</li>
+          <li>Fully keyboard navigable; announced correctly by screen readers via <code>aria-current="step"</code>.</li></ul>
+          <p>The indicator collapses to a compact "Step N of 4" label below 480px viewport width.</p>`
+  },
+  {
+    user: 'Perfect, ship it. Anything left on the list?',
+    out: `<p>Shipped behind the <code>checkout-v2</code> flag at 10% rollout; monitoring error rates for 24h before full release.</p>
+          <h2>Remaining nice-to-haves</h2>
+          <ul><li>Remember the cart for guests across sessions (currently members only).</li>
+          <li>Apple Pay / Google Pay buttons in the payment step.</li>
+          <li>Bundle-level discounts (buy-X-get-Y) in the pricing rule table.</li></ul>
+          <p>None of these block the release. Happy to pick any of them up next.</p>`
+  }
+];
+
+const host = document.getElementById('turns');
+turns.forEach(t => {
+  const turn = document.createElement('div');
+  turn.className = 'w-full';
+  turn.innerHTML = `
+    <div class="sticky"><div class="human-message-card"></div></div>
+    <div class="worked">Worked for ${20 + Math.floor(Math.random() * 70)}s</div>
+    <div class="prose"><div class="portal-markdown-root">${t.out}</div></div>`;
+  turn.querySelector('.human-message-card').textContent = t.user;
+  host.appendChild(turn);
+});
+</script>
+
+</body>
+</html>
